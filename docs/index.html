@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FallMail SDK · Playground</title>
+<meta name="description" content="Interactive playground for @ai-native-solutions/fallmail-sdk">
+<style>
+:root{--void:#1a1a1e;--deep:#212127;--surface:#2a2a30;--line:rgba(232,228,219,0.08);--text:#e8e4db;--muted:#928d80;--sage:#7a9c7e;--sage-dim:rgba(122,156,126,0.14)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--void);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.55;padding:32px;max-width:960px;margin:0 auto}
+h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:400;font-size:28px;margin-bottom:6px}
+h2{font-family:'Cormorant Garamond',Georgia,serif;font-weight:400;font-size:20px;margin:18px 0 10px}
+p.lead{color:var(--muted);margin-bottom:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--deep);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h3{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--sage);margin-bottom:10px}
+input,textarea,button{font-family:inherit;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;margin-bottom:8px;outline:none}
+textarea{min-height:80px;resize:vertical}
+button{background:var(--sage);color:var(--void);cursor:pointer;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;font-size:11px;padding:9px}
+button:hover{filter:brightness(1.1)}
+.log{background:#111;border:1px solid var(--line);border-radius:8px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);max-height:280px;overflow:auto;white-space:pre-wrap;margin-top:12px}
+.did{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--sage);padding:6px 8px;background:var(--surface);border-radius:5px;margin-bottom:8px;word-break:break-all}
+code{font-family:'JetBrains Mono',monospace;color:var(--sage);font-size:12px}
+</style>
+</head>
+<body>
+<h1>FallMail SDK Playground</h1>
+<p class="lead">Two in-process FallMail nodes wired to each other. Compose from Alice, receive at Bob (and vice-versa). Everything runs in this tab.</p>
+
+<div class="grid">
+  <div class="card">
+    <h3>Alice</h3>
+    <div class="did" id="a-did">…</div>
+    <input id="a-to" placeholder="to did (auto-filled to Bob)">
+    <input id="a-subject" placeholder="subject">
+    <textarea id="a-body" placeholder="body"></textarea>
+    <button data-from="a">Encrypt &amp; send</button>
+    <h3 style="margin-top:14px">Inbox</h3>
+    <div id="a-inbox" class="log">(empty)</div>
+  </div>
+  <div class="card">
+    <h3>Bob</h3>
+    <div class="did" id="b-did">…</div>
+    <input id="b-to" placeholder="to did (auto-filled to Alice)">
+    <input id="b-subject" placeholder="subject">
+    <textarea id="b-body" placeholder="body"></textarea>
+    <button data-from="b">Encrypt &amp; send</button>
+    <h3 style="margin-top:14px">Inbox</h3>
+    <div id="b-inbox" class="log">(empty)</div>
+  </div>
+</div>
+
+<h2>Wire trace</h2>
+<div id="trace" class="log">boot…</div>
+
+<script type="module">
+import { FallMail, InProcessLink, MemoryPod, MemoryStore } from '../src/index.js';
+
+const trace = document.getElementById('trace');
+const log = (m) => { trace.textContent += '\n' + m; trace.scrollTop = trace.scrollHeight; };
+
+const aliceId = { did: 'did:key:zAliceDemo' + Math.floor(Math.random() * 1000) };
+const bobId   = { did: 'did:key:zBobDemo'   + Math.floor(Math.random() * 1000) };
+
+const linkA = new InProcessLink({ ownId: aliceId.did });
+const linkB = new InProcessLink({ ownId: bobId.did });
+linkA.addPeer(linkB);
+
+const mailA = await new FallMail({ fallid: aliceId, falllink: linkA, fallpod: new MemoryPod(), fallstore: new MemoryStore() }).ready();
+const mailB = await new FallMail({ fallid: bobId,   falllink: linkB, fallpod: new MemoryPod(), fallstore: new MemoryStore() }).ready();
+
+document.getElementById('a-did').textContent = aliceId.did;
+document.getElementById('b-did').textContent = bobId.did;
+document.getElementById('a-to').value = bobId.did;
+document.getElementById('b-to').value = aliceId.did;
+
+function renderInbox(id, mail) {
+  mail.inbox().then(items => {
+    const el = document.getElementById(id);
+    el.textContent = items.length ? items.map(m => `[${m.verified ? '🔒' : '⚠'}] ${m.subject || '(no subject)'} — ${m.body.slice(0, 60)}`).join('\n') : '(empty)';
+  });
+}
+
+mailA.onMessage(m => { log(`Alice ← ${m.subject} from ${m.fromDid.slice(0,14)}…`); renderInbox('a-inbox', mailA); });
+mailB.onMessage(m => { log(`Bob   ← ${m.subject} from ${m.fromDid.slice(0,14)}…`); renderInbox('b-inbox', mailB); });
+
+document.querySelectorAll('button[data-from]').forEach(btn => {
+  btn.onclick = async () => {
+    const from = btn.dataset.from;
+    const src  = from === 'a' ? mailA : mailB;
+    const to = document.getElementById(from + '-to').value.trim();
+    const subject = document.getElementById(from + '-subject').value.trim();
+    const body = document.getElementById(from + '-body').value;
+    try {
+      const r = await src.send(to, subject, body);
+      log(`${from === 'a' ? 'Alice' : 'Bob'} → send id=${r.id.slice(0,10)} delivered=${r.delivered}`);
+      document.getElementById(from + '-subject').value = '';
+      document.getElementById(from + '-body').value = '';
+    } catch (e) { log('send error: ' + e.message); }
+  };
+});
+
+log('SDK booted. Alice ↔ Bob linked in-process. Try composing.');
+</script>
+</body>
+</html>
