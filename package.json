@@ -1,20 +1,24 @@
 {
   "name": "@ai-native-solutions/fallmail-sdk",
   "version": "1.0.0",
-  "description": "FallMail SDK - P2P encrypted messaging primitives. DID-addressed, ECDH+AES-GCM, no SMTP, no server.",
+  "description": "fallmail SDK · sovereign single-file library extracted from fallmail/index.html",
   "type": "module",
   "main": "src/index.js",
-  "exports": {
-    ".": "./src/index.js"
+  "types": "src/index.d.ts",
+  "files": ["src", "docs", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test test/",
+    "smoke": "node examples/smoke.js"
   },
-  "files": ["src", "README.md", "LICENSE"],
-  "keywords": ["fallmail", "p2p", "encrypted", "did", "ecdh", "aes-gcm", "sovereign", "messaging"],
+  "keywords": ["fallmail", "sdk", "sovereign", "ai-native-solutions"],
   "author": "AI-Native Solutions",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sjgant80-hub/fallmail-sdk"
+    "url": "https://github.com/sjgant80-hub/fallmail-sdk.git"
   },
   "homepage": "https://sjgant80-hub.github.io/fallmail-sdk/",
-  "publishConfig": { "access": "public" }
+  "publishConfig": {
+    "access": "public"
+  }
 }
